@@ -1,3 +1,8 @@
+/*
+  parser.hpp
+  recursive descent parser,
+  uses DBExpr from ast.hpp as datastructure for the expressions.
+*/
 #include<cctype>
 #include<iostream>
 #include<string>
@@ -9,14 +14,24 @@
 
 using namespace std;
 
+// Token_value contains all lexical tokens of the language
 enum Token_value{
 
   LAMBDA='%', BIND='.', VAR,
-  LP='(',     RP=')',   SEP=';',
+  LP='(',     RP=')',   SEP='\n',
   END
 };
 
+/*
+ curr_tok is the last read token,
+ initialized to SEP to start in a clean state
+*/
 Token_value curr_tok = SEP;
+
+/*
+  curr_var[] holds the last read variable,
+  array because of the arg type of find_end
+*/
 string curr_var[1];
 
 void error(const string& msg){
@@ -25,6 +40,12 @@ void error(const string& msg){
   exit(1);
 }
 
+/* 
+   get_token() is the basic lexer,
+   removes whitespace, sets/returns 
+   the next curr_tok and curr_var if
+   necessary
+*/
 Token_value get_token(){
   
   char ch;
@@ -35,7 +56,6 @@ Token_value get_token(){
   
   switch(ch){
    
-  case ';':
   case '\n':
     return curr_tok=SEP;
 
@@ -67,11 +87,16 @@ Token_value get_token(){
   }
 }
 
-DBTerm* parse_expr(bool get, list<string> vars);
+DBExpr* parse_expr(bool get, list<string> vars);
 
-DBTerm* parse_term(bool get, list<string> vars){
+/*
+  parse_term() parses abstractions and variables,
+  get signals whether the next token must be 
+  gotten first
+*/
+DBExpr* parse_term(bool get, list<string> vars){
 
-  DBTerm* root = new DBTerm;
+  DBExpr* root = new DBExpr;
 
   if(get) get_token();
   switch(curr_tok){
@@ -81,13 +106,12 @@ DBTerm* parse_term(bool get, list<string> vars){
     if(get_token() != BIND) error("binder expected");
     root->kind = ABS;
     vars.push_back(curr_var[0]);
-    root->lterm = parse_expr(true, vars);
+    root->lexpr = parse_expr(true, vars);
     return root;
   }
 
   case VAR:{
     root->kind = INDEX;
-    //if(vars.empty()) return root;
     list<string>::iterator i = find_end(vars.begin(), vars.end(), curr_var, curr_var+1);
     int j = vars.size() - distance(vars.begin(), i);
     if(j <= 0) error("variable not in scope: " + curr_var[0]); 
@@ -110,20 +134,23 @@ DBTerm* parse_term(bool get, list<string> vars){
   }
 }
 
-DBTerm* parse_expr(bool get, list<string> vars){
+/*
+  parse_expr() parses applications
+*/
+DBExpr* parse_expr(bool get, list<string> vars){
 
-  DBTerm* root = new DBTerm;
-  root->lterm = parse_term(get, vars);
+  DBExpr* root = new DBExpr;
+  root->lexpr = parse_term(get, vars);
   
   switch(curr_tok){
     
   case SEP:
   case END:
   case RP:
-    return root->lterm;
+    return root->lexpr;
 
   default:
-    root->rterm = parse_expr(false, vars);
+    root->rexpr = parse_expr(false, vars);
     root->kind = APP;
     return root;
     
