@@ -17,7 +17,7 @@ enum Token_value{
 };
 
 Token_value curr_tok = SEP;
-string string_value;
+string curr_var[1];
 
 void error(const string& msg){
   
@@ -53,9 +53,9 @@ Token_value get_token(){
 
   default:{
     if(isalpha(ch)){
-      string_value = ch;
+      curr_var[0] = ch;
       while(cin.get(ch) && isalnum(ch)){
-        string_value.push_back(ch);
+        curr_var[0].push_back(ch);
       }
       cin.putback(ch);
       return curr_tok=VAR;
@@ -72,27 +72,26 @@ DBTerm* parse_expr(bool get, list<string> vars);
 DBTerm* parse_term(bool get, list<string> vars){
 
   DBTerm* root = new DBTerm;
-  cout << "after decl of root in parse_term \n";
 
   if(get) get_token();
   switch(curr_tok){
 
   case LAMBDA:{
-    cout << "after case LAMBDA in parse term \n";
     if(get_token() != VAR) error("variable expected");
     if(get_token() != BIND) error("binder expected");
     root->kind = ABS;
-    vars.push_back(string_value);
+    vars.push_back(curr_var[0]);
     root->lterm = parse_expr(true, vars);
     return root;
   }
 
   case VAR:{
     root->kind = INDEX;
-    if(vars.empty()) return root;
-    list<string> s = {string_value};
-    list<string>::iterator i = find_end(vars.begin(), vars.end(), s.begin(), s.end());
-    root->index = distance(vars.begin(), i) + 1;
+    //if(vars.empty()) return root;
+    list<string>::iterator i = find_end(vars.begin(), vars.end(), curr_var, curr_var+1);
+    int j = vars.size() - distance(vars.begin(), i);
+    if(j <= 0) error("variable not in scope: " + curr_var[0]); 
+    else root->index = j;
     get_token();
     return root;
   }
@@ -114,29 +113,16 @@ DBTerm* parse_term(bool get, list<string> vars){
 DBTerm* parse_expr(bool get, list<string> vars){
 
   DBTerm* root = new DBTerm;
-  cout << "after decl of root in parse_expr \n";
   root->lterm = parse_term(get, vars);
   
   switch(curr_tok){
     
   case SEP:
   case END:
+  case RP:
     return root->lterm;
 
-    //here are some cases missing: VAR, LP ..?
-
   default:
-    string s;
-    switch(curr_tok){
-    case END: s = "END"; break;
-    case LAMBDA: s = "LAMBDA"; break;
-    case SEP: s = "SEP"; break;
-    case LP: s = "LP"; break;
-    case RP: s = "RP"; break;
-    case VAR: s = "VAR: " + string_value; break;
-    default: s = "unknown"; break;
-    }
-    cout << "after default in parse_expr, curr_tok == " << s << '\n';
     root->rterm = parse_expr(false, vars);
     root->kind = APP;
     return root;
